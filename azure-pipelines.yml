@@ -6,34 +6,39 @@ pool:
 
 variables:
   imageName: 'anandjoy7/myapp'
+  environment: 'staging'  # Change this to 'production' for production deploy
 
 steps:
+# Step 1: Install Node.js
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'
   displayName: 'Install Node.js'
 
+# Step 2: Install Dependencies and Build React Application
 - script: |
     npm install --legacy-peer-deps
     npm run build
   displayName: 'Install dependencies and build React application'
 
+# Step 3: Install Docker
 - task: DockerInstaller@0
   displayName: 'Install Docker'
 
-- checkout: self
-
+# Step 4: Build Docker Image
 - script: |
     docker build -t $(imageName):$(Build.BuildId) .
     docker tag $(imageName):$(Build.BuildId) $(imageName):latest
   displayName: 'Build Docker image'
 
+# Step 5: Login to Docker Hub
 - task: Docker@2
   displayName: 'Login to Docker Hub'
   inputs:
     command: 'login'
-    containerRegistry: 'DockerHub7'  # Ensure DockerHub7 matches your Docker service connection name
+    containerRegistry: 'DockerHub7'  # Ensure this matches your Docker service connection name
 
+# Step 6: Push Docker Image to Docker Hub
 - task: Docker@2
   displayName: 'Push Docker image'
   inputs:
@@ -42,3 +47,14 @@ steps:
     tags: |
       $(Build.BuildId)
       latest
+
+# Step 7: Deploy to Staging/Production Environment
+- script: |
+    docker run -d -p 80:80 --name $(environment)-frontend $(imageName):latest
+  displayName: 'Deploy Docker container'
+  condition: eq(variables['environment'], 'staging')
+
+# Step 8: Run Tests
+- script: |
+    npm test
+  displayName: 'Run tests'
